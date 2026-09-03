@@ -1,0 +1,28 @@
+# Dependencies and generated output
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+.vercel/
+
+# Local credentials (only the example belongs in Git)
+.env*
+!.env.example
+*.pem
+*.key
+
+# Generated PWA files
+/public/sw.js
+/public/workbox-*.js
+/public/worker-*.js
+
+# Separate local scaffold; the receipt app lives at the repository root
+/my-app/
+
+# OS files
+.DS_Store
+Thumbs.db
