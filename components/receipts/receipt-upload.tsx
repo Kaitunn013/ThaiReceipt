@@ -2,26 +2,15 @@
 
 import { ChangeEvent, useRef, useState } from "react";
 import { Loader2, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
 
+import { createReceiptId } from "@/lib/receipts";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+const JPEG_QUALITY = 0.82;
 const supportedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-const receiptCategoryOptions = [
-  { value: "food", label: "อาหาร" },
-  { value: "groceries", label: "ของใช้ในบ้าน/ของชำ" },
-  { value: "transportation", label: "การเดินทาง" },
-  { value: "utilities", label: "สาธารณูปโภค" },
-  { value: "healthcare", label: "สุขภาพ" },
-  { value: "education", label: "การศึกษา" },
-  { value: "shopping", label: "ช้อปปิ้ง" },
-  { value: "housing", label: "ที่อยู่อาศัย" },
-  { value: "tax_deductible", label: "ลดหย่อนภาษี" },
-  { value: "other", label: "อื่น ๆ" }
-] as const;
-
-type ReceiptCategory = (typeof receiptCategoryOptions)[number]["value"];
 
 type ReceiptScanResult = {
   vendor_name: string;
@@ -31,143 +20,90 @@ type ReceiptScanResult = {
   vat_amount: number;
   is_tax_invoice: boolean;
   memo: string;
-  suggested_category: ReceiptCategory;
+  suggested_category: string;
 };
 
-type ReviewValues = {
-  vendor_name: string;
-  tax_id: string;
-  date: string;
-  total_amount: string;
-  vat_amount: string;
-  is_tax_invoice: boolean;
-  memo: string;
-  suggested_category: ReceiptCategory;
+type UploadJob = {
+  id: string;
+  file: File;
+  status: "queued" | "scanning" | "saved" | "error";
+  errorMessage?: string;
 };
-
-function toReviewValues(result: ReceiptScanResult): ReviewValues {
-  return {
-    vendor_name: result.vendor_name,
-    tax_id: result.tax_id ?? "",
-    date: result.date ?? "",
-    total_amount: String(result.total_amount),
-    vat_amount: String(result.vat_amount),
-    is_tax_invoice: result.is_tax_invoice,
-    memo: result.memo,
-    suggested_category: result.suggested_category
-  };
-}
 
 function getFileExtension(file: File) {
-  if (file.type === "image/png") {
-    return "png";
-  }
-
-  if (file.type === "image/webp") {
-    return "webp";
-  }
-
+  if (file.type === "image/png") return "png";
+  if (file.type === "image/webp") return "webp";
   return "jpg";
 }
 
+function getJobStatusLabel(job: UploadJob) {
+  if (job.status === "queued") return "รออ่าน";
+  if (job.status === "scanning") return "กำลังอ่านและบันทึก";
+  if (job.status === "saved") return "บันทึกแล้ว";
+  return "อ่านไม่สำเร็จ";
+}
+
+async function optimizeReceiptImage(file: File) {
+  const objectUrl = URL.createObjectURL(file);
+
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("ไม่สามารถเตรียมรูปใบเสร็จได้"));
+      element.src = objectUrl;
+    });
+
+    const longEdge = Math.max(image.naturalWidth, image.naturalHeight);
+    if (!longEdge) return file;
+
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / longEdge);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return file;
+
+    context.drawImage(image, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY);
+    });
+
+    if (!blob || (scale === 1 && blob.size >= file.size)) return file;
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+      type: "image/jpeg",
+      lastModified: file.lastModified
+    });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export function ReceiptUpload() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [result, setResult] = useState<ReceiptScanResult | null>(null);
-  const [reviewValues, setReviewValues] = useState<ReviewValues | null>(null);
+  const [uploadJobs, setUploadJobs] = useState<UploadJob[]>([]);
 
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-
-    if (!file) {
-      return;
-    }
-
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setResult(null);
-    setReviewValues(null);
-    setIsSaved(false);
-
-    if (!supportedMimeTypes.has(file.type)) {
-      setErrorMessage("กรุณาเลือกไฟล์ JPEG, PNG หรือ WebP");
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_BYTES) {
-      setErrorMessage("ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 10MB)");
-      return;
-    }
-
-    setSelectedFile(file);
-
-    const formData = new FormData();
-    formData.append("image", file);
-    setIsScanning(true);
-
-    try {
-      const response = await fetch("/api/scan-receipt", {
-        method: "POST",
-        body: formData
-      });
-      const body = (await response.json().catch(() => null)) as
-        | { data?: ReceiptScanResult; error?: string }
-        | null;
-
-      if (!response.ok) {
-        throw new Error(body?.error ?? "ไม่สามารถอ่านใบเสร็จได้");
-      }
-
-      if (!body?.data) {
-        throw new Error("ไม่พบข้อมูลจากการอ่านใบเสร็จ");
-      }
-
-      setResult(body.data);
-      setReviewValues(toReviewValues(body.data));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "ไม่สามารถอ่านใบเสร็จได้");
-    } finally {
-      setIsScanning(false);
-    }
+  function updateJob(jobId: string, update: Partial<UploadJob>) {
+    setUploadJobs((current) =>
+      current.map((job) => (job.id === jobId ? { ...job, ...update } : job))
+    );
   }
 
-  async function handleSave() {
-    if (!selectedFile || !result || !reviewValues) {
-      return;
-    }
-
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsSaving(true);
+  async function processFiles(jobs: UploadJob[]) {
+    setIsProcessing(true);
+    let savedCount = 0;
+    let failedCount = 0;
 
     try {
-      const totalAmount = Number(reviewValues.total_amount);
-      const vatAmount = Number(reviewValues.vat_amount);
-      const taxId = reviewValues.tax_id.trim() || null;
-      const date = reviewValues.date.trim() || null;
-
-      if (!Number.isFinite(totalAmount) || totalAmount < 0) {
-        throw new Error("กรุณาระบุยอดรวมเป็นจำนวนที่ถูกต้อง");
-      }
-
-      if (!Number.isFinite(vatAmount) || vatAmount < 0) {
-        throw new Error("กรุณาระบุ VAT เป็นจำนวนที่ถูกต้อง");
-      }
-
-      if (taxId && !/^\d{13}$/.test(taxId)) {
-        throw new Error("เลขประจำตัวผู้เสียภาษีต้องมี 13 หลัก");
-      }
-
-      if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        throw new Error("กรุณาระบุวันที่ให้ถูกต้อง");
-      }
-
       const supabase = createSupabaseBrowserClient();
       const {
         data: { user },
@@ -178,68 +114,141 @@ export function ReceiptUpload() {
         throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
       }
 
-      const receiptId = crypto.randomUUID();
-      const imagePath = `${user.id}/${receiptId}.${getFileExtension(selectedFile)}`;
-      let uploadedImagePath: string | null = null;
+      for (const job of jobs) {
+        updateJob(job.id, { status: "scanning", errorMessage: undefined });
+        let uploadedImagePath: string | null = null;
 
-      try {
-        const { error: uploadError } = await supabase.storage
-          .from("receipt-images")
-          .upload(imagePath, selectedFile, {
+        try {
+          const preparedFile = await optimizeReceiptImage(job.file);
+          const receiptId = createReceiptId();
+          const imagePath = user.id + "/" + receiptId + "." + getFileExtension(preparedFile);
+          uploadedImagePath = imagePath;
+
+          const formData = new FormData();
+          formData.append("image", preparedFile);
+          const uploadTask = supabase.storage.from("receipt-images").upload(imagePath, preparedFile, {
             cacheControl: "3600",
-            contentType: selectedFile.type,
+            contentType: preparedFile.type,
             upsert: false
           });
+          const scanTask = fetch("/api/scan-receipt", {
+            method: "POST",
+            body: formData
+          });
 
-        if (uploadError) {
-          throw new Error(uploadError.message);
-        }
-
-        uploadedImagePath = imagePath;
-
-        const { error: receiptError } = await supabase.from("receipts").insert({
-          id: receiptId,
-          user_id: user.id,
-          household_id: null,
-          image_url: imagePath,
-          vendor_name: reviewValues.vendor_name.trim() || null,
-          tax_id: taxId,
-          date,
-          amount: totalAmount,
-          vat_amount: vatAmount,
-          is_tax_invoice: reviewValues.is_tax_invoice,
-          category: reviewValues.suggested_category,
-          is_shared_expense: false,
-          raw_ai_json: {
-            ...result,
-            vendor_name: reviewValues.vendor_name.trim(),
-            tax_id: taxId,
-            date,
-            total_amount: totalAmount,
-            vat_amount: vatAmount,
-            is_tax_invoice: reviewValues.is_tax_invoice,
-            memo: reviewValues.memo.trim(),
-            suggested_category: reviewValues.suggested_category
+          const [uploadResult, scanResult] = await Promise.allSettled([uploadTask, scanTask]);
+          if (uploadResult.status === "rejected") {
+            throw uploadResult.reason instanceof Error
+              ? uploadResult.reason
+              : new Error("ไม่สามารถอัปโหลดรูปใบเสร็จได้");
           }
-        });
+          if (uploadResult.value.error) throw new Error(uploadResult.value.error.message);
+          if (scanResult.status === "rejected") {
+            throw scanResult.reason instanceof Error
+              ? scanResult.reason
+              : new Error("ไม่สามารถอ่านใบเสร็จได้");
+          }
 
-        if (receiptError) {
-          throw new Error(receiptError.message);
+          const scanResponse = scanResult.value;
+          const scanBody = (await scanResponse.json().catch(() => null)) as
+            | { data?: ReceiptScanResult; error?: string }
+            | null;
+
+          if (!scanResponse.ok) {
+            throw new Error(scanBody?.error ?? "ไม่สามารถอ่านใบเสร็จได้");
+          }
+          if (!scanBody?.data) {
+            throw new Error("ไม่พบข้อมูลจากการอ่านใบเสร็จ");
+          }
+
+          const result = scanBody.data;
+          const { error: receiptError } = await supabase.from("receipts").insert({
+            id: receiptId,
+            user_id: user.id,
+            household_id: null,
+            image_url: imagePath,
+            vendor_name: result.vendor_name.trim() || null,
+            tax_id: result.tax_id?.trim() || null,
+            date: result.date?.trim() || null,
+            amount: result.total_amount,
+            vat_amount: result.vat_amount,
+            is_tax_invoice: result.is_tax_invoice,
+            memo: result.memo.trim() || null,
+            category: result.suggested_category,
+            is_shared_expense: false,
+            raw_ai_json: null
+          });
+
+          if (receiptError) throw new Error(receiptError.message);
+          updateJob(job.id, { status: "saved" });
+          savedCount += 1;
+        } catch (error) {
+          if (uploadedImagePath) {
+            await supabase.storage.from("receipt-images").remove([uploadedImagePath]);
+          }
+          failedCount += 1;
+          updateJob(job.id, {
+            status: "error",
+            errorMessage: error instanceof Error ? error.message : "ไม่สามารถบันทึกใบเสร็จได้"
+          });
         }
-      } catch (error) {
-        if (uploadedImagePath) {
-          await supabase.storage.from("receipt-images").remove([uploadedImagePath]);
-        }
-        throw error;
       }
-
-      setIsSaved(true);
-      setSuccessMessage("บันทึกใบเสร็จเรียบร้อยแล้ว");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "ไม่สามารถบันทึกใบเสร็จได้");
+      failedCount = jobs.length;
+      const message = error instanceof Error ? error.message : "ไม่สามารถอัปโหลดใบเสร็จได้";
+      jobs.forEach((job) => updateJob(job.id, { status: "error", errorMessage: message }));
     } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
+      if (savedCount > 0) {
+        setSuccessMessage("บันทึกใบเสร็จสำเร็จ " + savedCount + " รายการ");
+        router.refresh();
+      }
+      if (failedCount > 0) {
+        setErrorMessage("มี " + failedCount + " รายการที่บันทึกไม่สำเร็จ กรุณาตรวจสอบผลรายรูป");
+      }
     }
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const invalidType = files.find((file) => !supportedMimeTypes.has(file.type));
+    if (invalidType) {
+      setErrorMessage("กรุณาเลือกเฉพาะไฟล์ JPEG, PNG หรือ WebP");
+    }
+
+    const validFiles = files.filter(
+      (file) => supportedMimeTypes.has(file.type) && file.size <= MAX_IMAGE_BYTES
+    );
+    const oversizedCount = files.filter((file) => file.size > MAX_IMAGE_BYTES).length;
+    if (oversizedCount > 0) {
+      setErrorMessage("มี " + oversizedCount + " ไฟล์ที่ใหญ่เกินไป (สูงสุด 10MB)");
+    }
+    if (!validFiles.length) return;
+
+    const jobs = validFiles.map((file) => ({
+      id: createReceiptId(),
+      file,
+      status: "queued" as const
+    }));
+    setUploadJobs((current) => [...current, ...jobs]);
+    void processFiles(jobs);
+  }
+
+  function retryFailedJobs() {
+    if (isProcessing) return;
+
+    const failedJobs = uploadJobs.filter((job) => job.status === "error");
+    if (!failedJobs.length) return;
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    void processFiles(failedJobs);
   }
 
   return (
@@ -248,7 +257,10 @@ export function ReceiptUpload() {
         <div>
           <h2 className="font-medium">อัปโหลดใบเสร็จ</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            เลือกรูปใบเสร็จเพื่อให้ระบบช่วยอ่านข้อมูลด้วย AI
+            เลือกได้หลายรูป ระบบจะย่อรูป อ่าน และบันทึกให้อัตโนมัติ
+          </p>
+          <p className="mt-2 text-xs text-amber-700" role="note">
+            เพื่อความปลอดภัย กรุณาปิดบัง QR Code เลขบัญชี และข้อมูลที่ไม่เกี่ยวข้องก่อนอัปโหลด
           </p>
         </div>
 
@@ -257,16 +269,17 @@ export function ReceiptUpload() {
           className="hidden"
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          multiple
           onChange={handleFileChange}
         />
         <button
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
-          disabled={isScanning}
+          disabled={isProcessing}
           onClick={() => inputRef.current?.click()}
         >
-          {isScanning ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {isScanning ? "กำลังอ่านใบเสร็จ..." : "อัปโหลดใบเสร็จ"}
+          {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {isProcessing ? "กำลังอ่านและบันทึก..." : "เลือกรูปใบเสร็จ"}
         </button>
       </div>
 
@@ -278,137 +291,36 @@ export function ReceiptUpload() {
 
       {successMessage ? (
         <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
-          {successMessage}
+          {successMessage} แก้ไขรายละเอียดได้จากรายการในประวัติ
         </p>
       ) : null}
 
-      {reviewValues ? (
+      {uploadJobs.length ? (
         <div className="mt-5 rounded-lg border bg-background p-4">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="font-medium">ตรวจสอบข้อมูลก่อนบันทึก</h3>
-            <span className="text-sm text-muted-foreground">{isSaved ? "บันทึกแล้ว" : "ยังไม่ได้บันทึก"}</span>
-          </div>
-          <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-            <label className="block font-medium">
-              ร้านค้า
-              <input
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                value={reviewValues.vendor_name}
-                onChange={(event) =>
-                  setReviewValues((current) =>
-                    current ? { ...current, vendor_name: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="block font-medium">
-              วันที่
-              <input
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                type="date"
-                value={reviewValues.date}
-                onChange={(event) =>
-                  setReviewValues((current) => (current ? { ...current, date: event.target.value } : current))
-                }
-              />
-            </label>
-            <label className="block font-medium">
-              ยอดรวม
-              <input
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                value={reviewValues.total_amount}
-                onChange={(event) =>
-                  setReviewValues((current) =>
-                    current ? { ...current, total_amount: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="block font-medium">
-              VAT
-              <input
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                type="number"
-                min="0"
-                step="0.01"
-                inputMode="decimal"
-                value={reviewValues.vat_amount}
-                onChange={(event) =>
-                  setReviewValues((current) =>
-                    current ? { ...current, vat_amount: event.target.value } : current
-                  )
-                }
-              />
-            </label>
-            <label className="block font-medium">
-              เลขประจำตัวผู้เสียภาษี
-              <input
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                inputMode="numeric"
-                maxLength={13}
-                value={reviewValues.tax_id}
-                onChange={(event) =>
-                  setReviewValues((current) => (current ? { ...current, tax_id: event.target.value } : current))
-                }
-              />
-            </label>
-            <label className="block font-medium">
-              หมวดหมู่
-              <select
-                className="mt-2 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                value={reviewValues.suggested_category}
-                onChange={(event) =>
-                  setReviewValues((current) =>
-                    current
-                      ? { ...current, suggested_category: event.target.value as ReceiptCategory }
-                      : current
-                  )
-                }
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-medium">ผลการอัปโหลด</h3>
+            {uploadJobs.some((job) => job.status === "error") ? (
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={retryFailedJobs}
+                className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-60"
               >
-                {receiptCategoryOptions.map((category) => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-3 sm:col-span-2">
-              <input
-                className="size-4 accent-primary"
-                type="checkbox"
-                checked={reviewValues.is_tax_invoice}
-                onChange={(event) =>
-                  setReviewValues((current) =>
-                    current ? { ...current, is_tax_invoice: event.target.checked } : current
-                  )
-                }
-              />
-              เป็นใบกำกับภาษีเต็มรูป
-            </label>
-            <label className="block font-medium sm:col-span-2">
-              หมายเหตุ
-              <textarea
-                className="mt-2 min-h-20 w-full rounded-lg border bg-card px-3 py-2 outline-none ring-primary focus:ring-2"
-                value={reviewValues.memo}
-                onChange={(event) =>
-                  setReviewValues((current) => (current ? { ...current, memo: event.target.value } : current))
-                }
-              />
-            </label>
+                ลองใหม่เฉพาะรายการที่ล้มเหลว
+              </button>
+            ) : null}
           </div>
-          <button
-            className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
-            type="button"
-            disabled={isSaving || isSaved}
-            onClick={handleSave}
-          >
-            {isSaving ? <Loader2 className="size-4 animate-spin" /> : null}
-            {isSaving ? "กำลังบันทึก..." : isSaved ? "บันทึกแล้ว" : "ยืนยันและบันทึก"}
-          </button>
+          <ul className="mt-3 divide-y text-sm">
+            {uploadJobs.map((job) => (
+              <li key={job.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                <span className="min-w-0 break-words">{job.file.name}</span>
+                <span className={job.status === "error" ? "text-red-700" : job.status === "saved" ? "text-emerald-700" : "text-muted-foreground"}>
+                  {getJobStatusLabel(job)}
+                </span>
+                {job.errorMessage ? <span className="text-xs text-red-700">{job.errorMessage}</span> : null}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </section>

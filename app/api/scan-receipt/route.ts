@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -13,8 +13,11 @@ export const maxDuration = 60;
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const supportedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-const MAX_GEMINI_ATTEMPTS = 3;
-const GEMINI_RETRY_DELAYS_MS = [750, 2000];
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GEMINI_FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-3.8-flash"];
+const MAX_GEMINI_ATTEMPTS = 2;
+const GEMINI_RETRY_DELAYS_MS = [1000];
+const MAX_OUTPUT_TOKENS = 256;
 
 const extractionPrompt = `
 คุณเป็นผู้เชี่ยวชาญการอ่านใบเสร็จและเอกสารภาษีของประเทศไทย
@@ -127,13 +130,28 @@ async function readImagePayload(request: Request): Promise<ImagePayload | null> 
   return null;
 }
 
-async function generateReceiptContent(ai: GoogleGenAI, image: ImagePayload) {
+function getGeminiModel() {
+  return process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
+}
+
+function getGeminiConfig(model: string) {
+  return {
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+    responseMimeType: "application/json",
+    responseSchema: receiptScanJsonSchema,
+    ...(model.startsWith("gemini-3.")
+      ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+      : { temperature: 0 })
+  };
+}
+
+async function generateReceiptContentForModel(ai: GoogleGenAI, image: ImagePayload, model: string) {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_GEMINI_ATTEMPTS; attempt += 1) {
     try {
-      return await ai.models.generateContent({
-        model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash",
+      const response = await ai.models.generateContent({
+        model,
         contents: [
           {
             role: "user",
@@ -148,16 +166,17 @@ async function generateReceiptContent(ai: GoogleGenAI, image: ImagePayload) {
             ]
           }
         ],
-        config: {
-          temperature: 0,
-          responseMimeType: "application/json",
-          responseSchema: receiptScanJsonSchema
-        }
+        config: getGeminiConfig(model)
       });
+      return response;
     } catch (error) {
       lastError = error;
 
       if (!isRetryableGeminiError(error) || attempt === MAX_GEMINI_ATTEMPTS - 1) {
+        throw error;
+      }
+
+      if (getErrorStatus(error) === 503 && model !== GEMINI_FALLBACK_MODELS[0]) {
         throw error;
       }
 
@@ -170,7 +189,28 @@ async function generateReceiptContent(ai: GoogleGenAI, image: ImagePayload) {
   throw lastError ?? new Error("Gemini request failed.");
 }
 
+async function generateReceiptContent(ai: GoogleGenAI, image: ImagePayload) {
+  const models = Array.from(new Set([getGeminiModel(), ...GEMINI_FALLBACK_MODELS]));
+  let lastError: unknown;
+
+  for (const model of models) {
+    try {
+      return {
+        response: await generateReceiptContentForModel(ai, image, model),
+        model
+      };
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableGeminiError(error)) throw error;
+    }
+  }
+
+  throw lastError ?? new Error("Gemini request failed.");
+}
+
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -195,7 +235,7 @@ export async function POST(request: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const response = await generateReceiptContent(ai, image);
+    const { response, model } = await generateReceiptContent(ai, image);
 
     const responseText = response.text;
     if (!responseText) {
@@ -223,13 +263,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       data: normalizeReceiptScan(parsed.data),
       meta: {
-        model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash",
-        image_bytes: image.byteLength
+        model,
+        image_bytes: image.byteLength,
+        duration_ms: Date.now() - startedAt
       }
     });
   } catch (error) {
     const status = getErrorStatus(error);
-    console.error("receipt scan failed", error);
+    console.error("receipt scan failed", { duration_ms: Date.now() - startedAt }, error);
 
     if ([429, 500, 503, 504].includes(status ?? 0)) {
       return NextResponse.json(
