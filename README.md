@@ -45,4 +45,15 @@ Verification: TypeScript and an isolated production build passed. Browser checks
 2. Apply the migration with the Supabase CLI or SQL Editor.
 3. Install dependencies and run `npm run dev`.
 
+## LINE Login account linking
+
+The dashboard can link an existing Supabase account to LINE without replacing email login.
+
+1. Create a LINE Login channel under the same `Seepla` provider as the Messaging API channel.
+2. Register `https://seepla.vercel.app/auth/line/callback` as the LINE Login callback URL.
+3. Add `LINE_LOGIN_CHANNEL_ID` as a Config variable and `LINE_LOGIN_CHANNEL_SECRET` as a Secret in Vercel Production.
+4. Redeploy, sign in to the website, and select `เชื่อมต่อด้วย LINE` in the Dashboard.
+
+The LINE Login and Messaging API channels must stay under the same provider so the LINE user ID can be matched across both channels. The LINE webhook that receives receipt images is a separate next step after account linking is verified.
+
 `GEMINI_MODEL` defaults to `gemini-3.5-flash-lite`, which is suited to low-latency structured receipt extraction. The route automatically tries a fallback model when Gemini reports temporary unavailability.
