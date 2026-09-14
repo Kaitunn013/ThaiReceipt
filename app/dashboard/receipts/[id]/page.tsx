@@ -44,10 +44,10 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
   }
   if (!receipt) notFound();
 
-  const { data: image } = await supabase.storage
-    .from("receipt-images")
-    .createSignedUrl(receipt.image_url, 300);
-  const imageUrl = image?.signedUrl ?? null;
+  const imageUrl = receipt.image_url
+    ? (await supabase.storage.from("receipt-images").createSignedUrl(receipt.image_url, 300)).data
+        ?.signedUrl ?? null
+    : null;
   const fields = [
     ["ร้านค้า", receipt.vendor_name || "ไม่ระบุร้านค้า"],
     ["วันที่", formatReceiptDate(receipt.date)],
@@ -92,10 +92,17 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
           memo: receipt.memo ?? ""
         }}
       />
-      <section className="rounded-xl border bg-card p-5 shadow-sm" aria-label="รูปใบเสร็จ">
-        <h2 className="mb-4 font-semibold">รูปใบเสร็จ</h2>
-        <ReceiptImage key={imageUrl ?? "unavailable"} url={imageUrl} vendorName={receipt.vendor_name} />
-      </section>
+      {receipt.image_url ? (
+        <section className="rounded-xl border bg-card p-5 shadow-sm" aria-label="รูปใบเสร็จ">
+          <h2 className="mb-4 font-semibold">รูปใบเสร็จ</h2>
+          <ReceiptImage key={imageUrl ?? "unavailable"} url={imageUrl} vendorName={receipt.vendor_name} />
+        </section>
+      ) : (
+        <section className="rounded-xl border bg-card p-5 shadow-sm" aria-label="รูปใบเสร็จ">
+          <h2 className="mb-2 font-semibold">รูปใบเสร็จ</h2>
+          <p className="text-sm text-muted-foreground">รายการนี้เพิ่มจากข้อความ LINE จึงไม่มีรูปสลิป</p>
+        </section>
+      )}
       <ReceiptDeleteButton receiptId={receipt.id} />
     </main>
   );

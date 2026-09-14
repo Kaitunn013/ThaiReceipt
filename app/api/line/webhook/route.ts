@@ -9,7 +9,9 @@ import {
 import {
   formatReceiptAmount,
   formatReceiptDate,
-  getReceiptCategoryLabel
+  getReceiptCategoryLabel,
+  inferReceiptCategory,
+  resolveReceiptCategory
 } from "@/lib/receipts";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -30,12 +32,20 @@ type LineEvent = {
   message?: {
     type?: string;
     id?: string;
+    text?: string;
   };
 };
 
 type LineImage = ReceiptImagePayload & {
   buffer: Buffer;
   extension: string;
+};
+
+type ParsedLineExpense = {
+  description: string;
+  amount: number;
+  date: string;
+  category: ReturnType<typeof inferReceiptCategory>;
 };
 
 function isLineEvent(value: unknown): value is LineEvent {
@@ -142,8 +152,25 @@ async function downloadLineImage(token: string, messageId: string): Promise<Line
   };
 }
 
+function parseLineExpense(text: string): ParsedLineExpense | null {
+  const input = text.trim();
+  const amountMatch = input.match(/(?:฿\s*)?(\d{1,9}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:บาท|฿)?\s*$/i);
+  if (!amountMatch || amountMatch.index === undefined) return null;
+
+  const description = input.slice(0, amountMatch.index).replace(/[\s,:-]+$/, "").trim();
+  const amount = Number(amountMatch[1].replace(/,/g, ""));
+  if (!description || !Number.isFinite(amount) || amount <= 0) return null;
+
+  return {
+    description,
+    amount,
+    date: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date()),
+    category: inferReceiptCategory(description)
+  };
+}
+
 function formatSavedReceiptMessage(
-  result: Awaited<ReturnType<typeof scanReceiptImage>>["data"],
+  result: { vendor_name: string; total_amount: number; date: string | null; category: string },
   sourceLabel: string
 ) {
   return [
@@ -152,10 +179,67 @@ function formatSavedReceiptMessage(
     "ร้านค้า: " + (result.vendor_name || "ไม่ระบุ"),
     "ยอดรวม: " + formatReceiptAmount(result.total_amount),
     "วันที่: " + formatReceiptDate(result.date),
-    "หมวดหมู่: " + getReceiptCategoryLabel(result.suggested_category),
+    "หมวดหมู่: " + getReceiptCategoryLabel(result.category),
     "",
     "ดูรายละเอียดหรือแก้ไขได้ที่ " + SEEPLA_DASHBOARD_URL
   ].join("\n");
+}
+
+async function processLineText(
+  token: string,
+  replyToken: string | undefined,
+  lineUserId: string,
+  userId: string,
+  text: string,
+  supabase: ReturnType<typeof createSupabaseAdminClient>
+) {
+  const expense = parseLineExpense(text);
+  if (!expense) {
+    await safeReply(
+      token,
+      replyToken,
+      "พิมพ์รายการแบบนี้ได้เลย: กะเพรา 40 หรือ ค่าไฟ 850 บาท"
+    );
+    return;
+  }
+
+  const receiptId = randomUUID();
+  const { error } = await supabase.from("receipts").insert({
+    id: receiptId,
+    user_id: userId,
+    household_id: null,
+    image_url: null,
+    vendor_name: expense.description,
+    tax_id: null,
+    date: expense.date,
+    amount: expense.amount,
+    vat_amount: 0,
+    is_tax_invoice: false,
+    memo: "บันทึกจากข้อความ LINE",
+    category: expense.category,
+    is_shared_expense: false,
+    raw_ai_json: null
+  });
+
+  if (error) {
+    console.error("LINE text expense insert failed", error.message);
+    await safePush(token, lineUserId, "บันทึกรายการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    return;
+  }
+
+  await safePush(
+    token,
+    lineUserId,
+    formatSavedReceiptMessage(
+      {
+        vendor_name: expense.description,
+        total_amount: expense.amount,
+        date: expense.date,
+        category: expense.category
+      },
+      "เพิ่มจากข้อความ LINE"
+    )
+  );
 }
 
 async function processLineImage(
@@ -186,6 +270,7 @@ async function processLineImage(
     }
 
     const result = scanResult.data;
+    const category = resolveReceiptCategory(result.suggested_category, result.vendor_name);
     const { error: receiptError } = await supabase.from("receipts").insert({
       id: receiptId,
       user_id: userId,
@@ -198,7 +283,7 @@ async function processLineImage(
       vat_amount: result.vat_amount,
       is_tax_invoice: result.is_tax_invoice,
       memo: result.memo.trim() || null,
-      category: result.suggested_category,
+      category,
       is_shared_expense: false,
       raw_ai_json: null
     });
@@ -210,7 +295,15 @@ async function processLineImage(
     await safePush(
       token,
       lineUserId,
-      formatSavedReceiptMessage(result, "เพิ่มจาก LINE")
+      formatSavedReceiptMessage(
+        {
+          vendor_name: result.vendor_name,
+          total_amount: result.total_amount,
+          date: result.date,
+          category
+        },
+        "เพิ่มจาก LINE"
+      )
     );
   } catch (error) {
     if (imagePath) {
@@ -273,20 +366,6 @@ export async function POST(request: Request) {
       continue;
     }
 
-    if (event.type === "message" && event.message?.type === "text") {
-      await safeReply(
-        token,
-        event.replyToken,
-        "ส่งรูปใบเสร็จมาได้เลย ระบบจะอ่านและบันทึกให้อัตโนมัติ\nดูรายการทั้งหมดได้ที่ " +
-          SEEPLA_DASHBOARD_URL
-      );
-      continue;
-    }
-
-    if (event.type !== "message" || event.message?.type !== "image" || !event.message.id) {
-      continue;
-    }
-
     const { data: profile, error: profileError } = await supabase
       .from("users")
       .select("id")
@@ -305,6 +384,22 @@ export async function POST(request: Request) {
         event.replyToken,
         "กรุณาเชื่อมต่อ LINE กับบัญชี Seepla ก่อนใช้งาน\n" + SEEPLA_DASHBOARD_URL
       );
+      continue;
+    }
+
+    if (event.type === "message" && event.message?.type === "text") {
+      await processLineText(
+        token,
+        event.replyToken,
+        lineUserId,
+        profile.id,
+        event.message.text ?? "",
+        supabase
+      );
+      continue;
+    }
+
+    if (event.type !== "message" || event.message?.type !== "image" || !event.message.id) {
       continue;
     }
 

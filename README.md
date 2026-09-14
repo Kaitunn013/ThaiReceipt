@@ -56,6 +56,8 @@ The dashboard can link an existing Supabase account to LINE without replacing em
 
 The LINE Login and Messaging API channels must stay under the same provider so the LINE user ID can be matched across both channels.
 
+Text messages are also supported in the LINE chat. Send a description followed by the amount, for example: กะเพรา 40 or ค่าไฟ 850 บาท. The server uses the Bangkok date, classifies the category with local keywords, and saves the entry without an image. Receipt images use Gemini's suggested category and fall back to the same keyword classifier when Gemini returns other.
+
 ## LINE webhook receipt intake
 
 The webhook accepts one-to-one image messages from LINE users who have already linked their LINE account in the Dashboard. It verifies the LINE signature, acknowledges the message immediately, then downloads the private image, scans it with Gemini, saves the image and approved receipt fields, and sends the result back to LINE. Group chats are intentionally ignored in this first version.

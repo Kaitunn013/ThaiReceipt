@@ -94,7 +94,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     .select("image_url")
     .eq("id", id)
     .eq("user_id", user.id)
-    .maybeSingle<{ image_url: string }>();
+    .maybeSingle<{ image_url: string | null }>();
 
   if (lookupError) {
     return NextResponse.json({ error: "Unable to delete receipt right now." }, { status: 500 });
@@ -104,12 +104,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Receipt not found." }, { status: 404 });
   }
 
-  const { error: imageError } = await supabase.storage
-    .from("receipt-images")
-    .remove([receipt.image_url]);
+  if (receipt.image_url) {
+    const { error: imageError } = await supabase.storage
+      .from("receipt-images")
+      .remove([receipt.image_url]);
 
-  if (imageError) {
-    return NextResponse.json({ error: "Unable to delete receipt image right now." }, { status: 500 });
+    if (imageError) {
+      return NextResponse.json({ error: "Unable to delete receipt image right now." }, { status: 500 });
+    }
   }
 
   const { error: deleteError } = await supabase
