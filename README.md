@@ -54,6 +54,18 @@ The dashboard can link an existing Supabase account to LINE without replacing em
 3. Add `LINE_LOGIN_CHANNEL_ID` as a Config variable and `LINE_LOGIN_CHANNEL_SECRET` as a Secret in Vercel Production.
 4. Redeploy, sign in to the website, and select `เชื่อมต่อด้วย LINE` in the Dashboard.
 
-The LINE Login and Messaging API channels must stay under the same provider so the LINE user ID can be matched across both channels. The LINE webhook that receives receipt images is a separate next step after account linking is verified.
+The LINE Login and Messaging API channels must stay under the same provider so the LINE user ID can be matched across both channels.
+
+## LINE webhook receipt intake
+
+The webhook accepts one-to-one image messages from LINE users who have already linked their LINE account in the Dashboard. It verifies the LINE signature, acknowledges the message immediately, then downloads the private image, scans it with Gemini, saves the image and approved receipt fields, and sends the result back to LINE. Group chats are intentionally ignored in this first version.
+
+Production setup:
+
+1. Add SUPABASE_SERVICE_ROLE_KEY as a Secret in Vercel Production. Do not use a public prefix and do not expose this key to the browser.
+2. Deploy the latest commit.
+3. In the LINE Developers Console, open the Messaging API channel and set the webhook URL to https://seepla.vercel.app/api/line/webhook.
+4. Enable Use webhook. Disable automatic replies and greeting messages to avoid duplicate responses.
+5. Send a receipt image to the LINE Official Account. The LINE user must first be connected from the signed-in Seepla Dashboard.
 
 `GEMINI_MODEL` defaults to `gemini-3.5-flash-lite`, which is suited to low-latency structured receipt extraction. The route automatically tries a fallback model when Gemini reports temporary unavailability.
