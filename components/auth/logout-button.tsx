@@ -16,7 +16,7 @@ export function LogoutButton() {
 
   return (
     <button
-      className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60"
+      className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
       type="button"
       disabled={isSubmitting}
       onClick={logout}

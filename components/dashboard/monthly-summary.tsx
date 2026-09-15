@@ -1,6 +1,5 @@
 "use client";
 
-import { ChartPie, PiggyBank, Target, Wallet } from "lucide-react";
 import Image from "next/image";
 import { useState, type FormEvent } from "react";
 
@@ -227,37 +226,42 @@ export function MonthlySummary({
           ) : null}
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <article className="rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">ยอดใช้จ่ายเดือนนี้</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
                     {formatReceiptAmount(totalAmount)}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">{receipts.length} รายการ</p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Wallet className="size-4" aria-hidden="true" />
-                </span>
               </div>
+              <Image
+                src="/images/mascots/expense.png"
+                alt="มาสคอตตรวจสอบรายจ่าย"
+                width={1600}
+                height={1600}
+                sizes="60px"
+                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+              />
             </article>
-            <article className="rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">วงเงินเดือนนี้</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
                     {budgetTotal ? formatReceiptAmount(budgetTotal) : "—"}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">จาก limit ที่ตั้งไว้</p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
-                  <Target className="size-4" aria-hidden="true" />
-                </span>
               </div>
+              <Image
+                src="/images/mascots/budget.png"
+                alt="มาสคอตผู้พิทักษ์วงเงิน"
+                width={1600}
+                height={1600}
+                sizes="60px"
+                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+              />
             </article>
-            <article className="rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="relative z-10 pr-16">
                   <p className="text-sm text-muted-foreground">วงเงินคงเหลือ</p>
                   <p
                     className={
@@ -268,25 +272,32 @@ export function MonthlySummary({
                     {budgetTotal ? formatReceiptAmount(remainingBudget) : "—"}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">เทียบกับค่าใช้จ่ายเดือนนี้</p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                  <PiggyBank className="size-4" aria-hidden="true" />
-                </span>
               </div>
+              <Image
+                src="/images/mascots/remaining.png"
+                alt="มาสคอตวงเงินคงเหลือ"
+                width={1600}
+                height={1600}
+                sizes="80px"
+                className="mascot-float pointer-events-none absolute right-2 top-1 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+              />
             </article>
-            <article className="rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">หมวดที่มีรายการ</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
                     {usedCategoryCount} <span className="text-sm font-normal text-muted-foreground">/ 10</span>
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">หมวดที่ใช้งานในเดือนนี้</p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
-                  <ChartPie className="size-4" aria-hidden="true" />
-                </span>
               </div>
+              <Image
+                src="/images/mascots/categories.png"
+                alt="มาสคอตจัดหมวดหมู่รายจ่าย"
+                width={1920}
+                height={1280}
+                sizes="60px"
+                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+              />
             </article>
           </div>
 

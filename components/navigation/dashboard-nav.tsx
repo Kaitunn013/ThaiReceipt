@@ -49,7 +49,7 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2 sm:gap-4 sm:px-6">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2 px-4 py-2 sm:gap-1 sm:px-6">
         <a
           href="/dashboard#home"
           className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-2 text-lg font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -64,11 +64,11 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
           />
         </a>
 
-        <nav aria-label="เมนูหลัก" className="order-3 grid w-full grid-cols-3 gap-1 sm:order-2 sm:w-auto sm:flex-1 sm:justify-end">
+        <nav aria-label="เมนูหลัก" className="order-3 flex w-full justify-end gap-1 sm:order-2 sm:ml-auto sm:w-auto sm:flex-none">
           {navItems.map(({ id, label, icon: Icon }) => {
             const isActive = activeSection === id;
             const className =
-              "flex min-h-11 items-center justify-center gap-1 rounded-lg px-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-2 sm:px-3 sm:text-sm " +
+              "flex min-h-10 items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-2 sm:px-3 sm:text-sm " +
               (isActive
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground");
