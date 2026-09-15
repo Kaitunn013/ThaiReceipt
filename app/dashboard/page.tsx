@@ -43,10 +43,19 @@ function getNextMonth(month: string) {
   return new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
 }
 
+function getEarliestMonth(currentMonth: string) {
+  const [year, monthNumber] = currentMonth.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber - 1 - 24, 1)).toISOString().slice(0, 7);
+}
+
 function getMonthOptions(currentMonth: string, dates: ReceiptDate[]) {
+  const earliestMonth = getEarliestMonth(currentMonth);
   const savedMonths = dates
     .map(({ date }) => date?.slice(0, 7))
-    .filter((month): month is string => Boolean(month && isValidMonth(month) && month <= currentMonth))
+    .filter(
+      (month): month is string =>
+        Boolean(month && isValidMonth(month) && month >= earliestMonth && month <= currentMonth)
+    )
     .sort();
   const firstMonth = savedMonths[0] ?? currentMonth;
   const months: string[] = [];
@@ -70,7 +79,13 @@ export default async function DashboardPage({
   const params = searchParams ? await searchParams : {};
   const currentMonth = getCurrentBangkokMonth();
   const requestedMonth = isValidMonth(params.month) ? params.month : currentMonth;
-  const summaryMonth = requestedMonth > currentMonth ? currentMonth : requestedMonth;
+  const earliestMonth = getEarliestMonth(currentMonth);
+  const summaryMonth =
+    requestedMonth > currentMonth
+      ? currentMonth
+      : requestedMonth < earliestMonth
+        ? earliestMonth
+        : requestedMonth;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user }
@@ -140,11 +155,12 @@ export default async function DashboardPage({
   return (
     <div className="min-h-screen">
       <DashboardNav userEmail={user.email ?? null} />
-      <main id="home" className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      <main id="home" className="scroll-mt-16 mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <CategoryBudgetHealth key={summaryMonth} receipts={monthlyReceipts ?? []} budgets={budgets ?? []} />
 
         <div id="dashboard" className="scroll-mt-24 space-y-6">
-          <LineConnectButton connected={Boolean(profile?.line_user_id)} message={lineMessage} />
           <MonthlySummary
+            key={summaryMonth}
             month={summaryMonth}
             receipts={monthlyReceipts ?? []}
             hasError={Boolean(monthlyError)}
@@ -153,12 +169,10 @@ export default async function DashboardPage({
           />
         </div>
 
-        <div className="grid gap-6 lg:items-start lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
           <div id="history" className="scroll-mt-24">
             <ReceiptHistory receipts={receipts ?? []} hasError={Boolean(error)} />
           </div>
-          <CategoryBudgetHealth receipts={monthlyReceipts ?? []} budgets={budgets ?? []} />
-        </div>
+        <LineConnectButton connected={Boolean(profile?.line_user_id)} message={lineMessage} />
         <div id="upload-receipt" className="scroll-mt-24">
           <ReceiptUpload compact />
         </div>

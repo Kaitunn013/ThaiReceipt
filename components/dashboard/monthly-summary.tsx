@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 
 import { formatReceiptAmount, receiptCategoryOptions } from "@/lib/receipts";
 
@@ -103,8 +104,11 @@ export function MonthlySummary({
   months: string[];
   budgets: CategoryBudget[];
 }) {
+  const router = useRouter();
   const [currentBudgets, setCurrentBudgets] = useState(budgets);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
+  const [isMonthMenuOpen, setIsMonthMenuOpen] = useState(false);
+  const monthMenuRef = useRef<HTMLDivElement>(null);
   const [savingCategory, setSavingCategory] = useState<string | null>(null);
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
   const [budgetError, setBudgetError] = useState(false);
@@ -119,6 +123,27 @@ export function MonthlySummary({
   const budgetTotal = categoryTotals.reduce((sum, item) => sum + (item.limit ?? 0), 0);
   const remainingBudget = budgetTotal - totalAmount;
   const usedCategoryCount = categoryTotals.filter((item) => item.amount > 0).length;
+
+  useEffect(() => {
+    if (!isMonthMenuOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!monthMenuRef.current?.contains(event.target as Node)) {
+        setIsMonthMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMonthMenuOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMonthMenuOpen]);
 
   async function handleBudgetSubmit(event: FormEvent<HTMLFormElement>, category: string) {
     event.preventDefault();
@@ -151,6 +176,7 @@ export function MonthlySummary({
         const withoutCurrent = current.filter((item) => item.category !== category);
         return limit === null ? withoutCurrent : [...withoutCurrent, { category, amount: limit }];
       });
+      router.refresh();
       setBudgetMessage(category);
     } catch {
       setBudgetError(true);
@@ -168,30 +194,55 @@ export function MonthlySummary({
             เดือน{formatMonth(month)}
           </h2>
         </div>
-        <form action="/dashboard" method="get" className="flex flex-wrap items-end gap-2">
-          <div className="w-full sm:w-auto">
+        <div className="flex flex-wrap items-end gap-2">
+          <div ref={monthMenuRef} className="relative w-full sm:w-64">
             <label htmlFor="summary-month" className="text-sm font-medium">
               เลือกเดือน
             </label>
-            <select
+            <button
+              type="button"
               id="summary-month"
-              name="month"
-              defaultValue={month}
-              className="mt-1 h-11 w-full min-w-0 rounded-xl border bg-card px-3 text-base"
+              aria-haspopup="listbox"
+              aria-expanded={isMonthMenuOpen}
+              aria-controls="summary-month-options"
+              onClick={() => setIsMonthMenuOpen((open) => !open)}
+              className="mt-1 flex h-11 w-full items-center justify-between rounded-xl border bg-card px-3 text-left text-base transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              {months.map((option) => (
-                <option key={option} value={option}>
-                  {formatMonth(option)}
-                </option>
-              ))}
-            </select>
+              <span>{formatMonth(month)}</span>
+              <span aria-hidden="true">⌄</span>
+            </button>
+            {isMonthMenuOpen ? (
+              <div
+                id="summary-month-options"
+                role="listbox"
+                aria-label="รายการเดือน"
+                className="absolute left-0 top-full z-50 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border bg-card p-1 shadow-xl"
+              >
+                {months.map((option) => {
+                  const isSelected = option === month;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => {
+                        setIsMonthMenuOpen(false);
+                        router.push("/dashboard?month=" + option + "#dashboard");
+                      }}
+                      className={
+                        "flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " +
+                        (isSelected ? "bg-primary/10 font-medium text-primary" : "text-foreground")
+                      }
+                    >
+                      <span>{formatMonth(option)}</span>
+                      {isSelected ? <span aria-hidden="true">✓</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
-          <button
-            type="submit"
-            className="h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            ดูสรุป
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -206,7 +257,7 @@ export function MonthlySummary({
           >
             + เพิ่มสลิป
           </button>
-        </form>
+        </div>
       </div>
 
       {hasError ? (
@@ -225,7 +276,7 @@ export function MonthlySummary({
             </div>
           ) : null}
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
               <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">ยอดใช้จ่ายเดือนนี้</p>
@@ -240,7 +291,7 @@ export function MonthlySummary({
                 width={1600}
                 height={1600}
                 sizes="70px"
-                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                className="pointer-events-none absolute -top-[50px] right-3 z-0 size-[90px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
             <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
@@ -257,7 +308,7 @@ export function MonthlySummary({
                 width={1600}
                 height={1600}
                 sizes="70px"
-                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                className="pointer-events-none absolute -top-[60px] right-3 z-0 size-[80px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
             <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
@@ -266,7 +317,7 @@ export function MonthlySummary({
                   <p
                     className={
                       "mt-1 text-xl font-semibold tabular-nums " +
-                      (budgetTotal && remainingBudget < 0 ? "text-red-700" : "")
+                      (budgetTotal && remainingBudget < 0 ? "text-red-700 dark:text-red-300" : "")
                     }
                   >
                     {budgetTotal ? formatReceiptAmount(remainingBudget) : "—"}
@@ -278,8 +329,8 @@ export function MonthlySummary({
                 alt="มาสคอตวงเงินคงเหลือ"
                 width={1600}
                 height={1600}
-                sizes="80px"
-                className="pointer-events-none absolute -top-5 right-3 z-0 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                sizes="120px"
+                className="pointer-events-none absolute -top-[75px] right-3 z-0 size-[120px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
             <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
@@ -295,8 +346,8 @@ export function MonthlySummary({
                 alt="มาสคอตจัดหมวดหมู่รายจ่าย"
                 width={1920}
                 height={1280}
-                sizes="70px"
-                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                sizes="120px"
+                className="pointer-events-none absolute -top-[60px] right-3 z-0 size-[85px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
           </div>
@@ -340,7 +391,7 @@ export function MonthlySummary({
                     key={item.value}
                     className={
                       "rounded-xl p-1 " +
-                      (item.overLimit ? "bg-red-50/70" : "bg-card/70")
+                      (item.overLimit ? "bg-red-50/70 dark:bg-red-950/40" : "bg-card/70")
                     }
                   >
                     <button
@@ -411,7 +462,7 @@ export function MonthlySummary({
                               <span>ความคืบหน้าวงเงิน</span>
                               <span
                                 className={
-                                  item.overLimit ? "font-medium text-red-700" : "text-muted-foreground"
+                                  item.overLimit ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"
                                 }
                               >
                                 {item.overLimit
@@ -518,6 +569,7 @@ export function MonthlySummary({
               ))}
             </tbody>
           </table>
+
         </>
       )}
     </section>
@@ -531,6 +583,7 @@ export function CategoryBudgetHealth({
   receipts: MonthlyReceipt[];
   budgets: CategoryBudget[];
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const categoryTotals = buildCategoryTotals(receipts, budgets);
   const trackedCategories = categoryTotals
     .filter((item) => item.limit !== null)
@@ -542,14 +595,28 @@ export function CategoryBudgetHealth({
   const isOverBudget = budgetTotal > 0 && totalAmount > budgetTotal;
   const isNearBudget = budgetTotal > 0 && totalAmount >= budgetTotal * 0.8;
   const healthLabel = isOverBudget ? "เกินวงเงิน" : isNearBudget ? "ใกล้ถึงวงเงิน" : "อยู่ในแผน";
+  const healthImageSrc =
+    overallProgress < 80
+      ? "/images/budget-health/green.png"
+      : overallProgress < 100
+        ? "/images/budget-health/yellow.png"
+        : "/images/budget-health/red.png";
   const healthTone = isOverBudget
-    ? "bg-red-50 text-red-900"
+    ? "bg-red-50 text-red-900 dark:bg-red-950/50 dark:text-red-200"
     : isNearBudget
-      ? "bg-amber-50 text-amber-900"
-      : "bg-emerald-50 text-emerald-900";
+      ? "bg-amber-50 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+      : "bg-emerald-50 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200";
 
   return (
-    <section className="rounded-2xl border bg-card p-5 shadow-sm" aria-labelledby="budget-health-title">
+    <section className="relative rounded-2xl border bg-card p-5 shadow-sm transition-colors hover:border-primary/50" aria-labelledby="budget-health-title">
+      <button
+        type="button"
+        className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={isExpanded ? "ย่อรายละเอียดสุขภาพการเงิน" : "ดูรายละเอียดสุขภาพการเงิน"}
+        aria-expanded={isExpanded}
+        aria-controls="budget-health-details"
+        onClick={() => setIsExpanded((value) => !value)}
+      />
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="budget-health-title" className="font-semibold">
@@ -583,7 +650,7 @@ export function CategoryBudgetHealth({
               </p>
             </div>
             <Image
-              src="/images/budget-health/green.png"
+              src={healthImageSrc}
               alt="ภาพประกอบสุขภาพการเงิน"
               width={170}
               height={112}
@@ -595,7 +662,7 @@ export function CategoryBudgetHealth({
           <div className="mt-5">
             <div className="flex items-center justify-between gap-3 text-xs">
               <span>วงเงินรวม</span>
-              <span className={isOverBudget ? "font-medium text-red-700" : "text-muted-foreground"}>
+              <span className={isOverBudget ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"}>
                 {overallProgress.toFixed(0)}%
               </span>
             </div>
@@ -614,12 +681,12 @@ export function CategoryBudgetHealth({
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div id="budget-health-details" hidden={!isExpanded} className="mt-5 space-y-3">
             {trackedCategories.map((item) => (
               <div key={item.value}>
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="min-w-0 truncate">{item.label}</span>
-                  <span className={item.overLimit ? "font-medium text-red-700" : "text-muted-foreground"}>
+                  <span className={item.overLimit ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"}>
                     {formatReceiptAmount(item.amount)} / {formatReceiptAmount(item.limit ?? 0)}
                   </span>
                 </div>

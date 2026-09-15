@@ -1,7 +1,8 @@
 "use client";
 
-import { History, Home, LayoutDashboard, UserRound } from "lucide-react";
+import { History, Home, LayoutDashboard, UserRound, Moon, Sun } from "lucide-react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -13,8 +14,23 @@ const navItems = [
 ] as const;
 
 export function DashboardNav({ userEmail }: { userEmail: string | null }) {
-  const [activeSection, setActiveSection] = useState("home");
+  const pathname = usePathname();
+  const [activeSection, setActiveSection] = useState(() =>
+    pathname.startsWith("/dashboard/receipts") ? "history" : "home"
+  );
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  function toggleTheme() {
+    const next = !document.documentElement.classList.contains("dark");
+    document.documentElement.classList.toggle("dark", next);
+    setIsDark(next);
+    try { localStorage.setItem("seepla-theme", next ? "dark" : "light"); } catch {}
+  }
 
   useEffect(() => {
     const syncFromHash = () => {
@@ -106,6 +122,15 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
             >
               <p className="text-xs font-medium text-muted-foreground">บัญชีผู้ใช้</p>
               <p className="mt-1 truncate text-sm font-medium">{userEmail ?? "ไม่พบอีเมล"}</p>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                aria-pressed={isDark}
+                className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-lg border bg-muted px-3 text-sm font-medium transition-colors hover:bg-primary/10"
+              >
+                {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+                {isDark ? "เปลี่ยนเป็นธีมสว่าง" : "เปลี่ยนเป็นธีมมืด"}
+              </button>
               <div className="mt-3 border-t pt-3 [&>button]:w-full">
                 <LogoutButton />
               </div>

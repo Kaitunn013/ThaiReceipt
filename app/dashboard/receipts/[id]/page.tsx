@@ -35,7 +35,12 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
   if (error) {
     return (
       <main className="mx-auto min-h-screen max-w-3xl space-y-5 px-5 py-10">
-        <Link href="/dashboard" className="text-sm text-primary underline">← กลับ Dashboard</Link>
+        <Link
+          href="/dashboard"
+          className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          ← กลับ Dashboard
+        </Link>
         <h1 className="text-2xl font-semibold">รายละเอียดใบเสร็จ</h1>
         <p role="alert">โหลดรายละเอียดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง</p>
         <RefreshButton />
@@ -61,7 +66,12 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-5 py-10">
-      <Link href="/dashboard" className="self-start text-sm text-primary underline underline-offset-4">← กลับ Dashboard</Link>
+      <Link
+        href="/dashboard"
+        className="inline-flex min-h-11 self-start items-center rounded-lg border px-4 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        ← กลับ Dashboard
+      </Link>
       <div>
         <p className="text-sm text-muted-foreground">ใบเสร็จที่บันทึกแล้ว</p>
         <h1 className="mt-2 break-words text-3xl font-semibold">{receipt.vendor_name || "รายละเอียดใบเสร็จ"}</h1>

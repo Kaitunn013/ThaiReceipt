@@ -24,9 +24,8 @@ export function ReceiptHistory({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ? "โหลดประวัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" : null
   );
-  const [showAll, setShowAll] = useState(false);
   const requestActive = useRef(false);
-  const visibleReceipts = showAll ? receipts : receipts.slice(0, INITIAL_VISIBLE_RECEIPTS);
+  const visibleReceipts = receipts.slice(0, INITIAL_VISIBLE_RECEIPTS);
 
   const loadReceipts = useCallback(async (showError: boolean) => {
     if (requestActive.current) return;
@@ -72,7 +71,7 @@ export function ReceiptHistory({
     <section className="rounded-xl border bg-card p-5 shadow-sm" aria-labelledby="receipt-history-title">
       <div>
         <div>
-          <h2 id="receipt-history-title" className="font-semibold">ประวัติใบเสร็จ</h2>
+          <h2 id="receipt-history-title" className="font-semibold">ประวัติรายจ่าย</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             20 รายการล่าสุดของคุณ · อัปเดตอัตโนมัติทุก 3 วินาที
           </p>
@@ -111,14 +110,13 @@ export function ReceiptHistory({
               </li>
             ))}
           </ul>
-          {receipts.length > INITIAL_VISIBLE_RECEIPTS && !showAll ? (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="mt-4 min-h-11 w-full rounded-lg border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          {receipts.length > INITIAL_VISIBLE_RECEIPTS ? (
+            <Link
+              href="/dashboard/receipts"
+              className="mt-4 flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               ดูทั้งหมด ({receipts.length} รายการ)
-            </button>
+            </Link>
           ) : null}
         </>
       )}
