@@ -279,7 +279,7 @@ export function MonthlySummary({
                 width={1600}
                 height={1600}
                 sizes="80px"
-                className="mascot-float pointer-events-none absolute -top-6 right-2 z-0 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                className="pointer-events-none absolute -top-5 right-3 z-0 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
             <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
