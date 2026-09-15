@@ -1,6 +1,7 @@
 "use client";
 
-import { History, Home, LayoutDashboard, Upload, UserRound } from "lucide-react";
+import { History, Home, LayoutDashboard, UserRound } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -8,12 +9,12 @@ import { LogoutButton } from "@/components/auth/logout-button";
 const navItems = [
   { id: "home", label: "Home", icon: Home },
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "upload-receipt", label: "Upload", icon: Upload },
   { id: "history", label: "History", icon: History }
 ] as const;
 
 export function DashboardNav({ userEmail }: { userEmail: string | null }) {
   const [activeSection, setActiveSection] = useState("home");
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const syncFromHash = () => {
@@ -53,13 +54,17 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
           href="/dashboard#home"
           className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-2 text-lg font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-            S
-          </span>
-          Seepla
+          <Image
+            src="/images/icon%20web/seepla_icon.png"
+            alt="Seepla"
+            width={2736}
+            height={912}
+            priority
+            className="h-8 w-auto object-contain"
+          />
         </a>
 
-        <nav aria-label="เมนูหลัก" className="order-3 grid w-full grid-cols-4 gap-1 sm:order-2 sm:w-auto sm:flex-1 sm:justify-end">
+        <nav aria-label="เมนูหลัก" className="order-3 grid w-full grid-cols-3 gap-1 sm:order-2 sm:w-auto sm:flex-1 sm:justify-end">
           {navItems.map(({ id, label, icon: Icon }) => {
             const isActive = activeSection === id;
             const className =
@@ -67,20 +72,6 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
               (isActive
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground");
-
-            if (id === "upload-receipt") {
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className={className}
-                  onClick={() => document.getElementById("receipt-file-input")?.click()}
-                >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span>{label}</span>
-                </button>
-              );
-            }
 
             return (
               <a
@@ -96,12 +87,30 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
           })}
         </nav>
 
-        <div className="order-2 ml-auto flex min-w-0 items-center gap-2 sm:order-3">
-          <UserRound className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="max-w-[160px] truncate text-sm text-muted-foreground sm:max-w-[220px]">
-            {userEmail ?? "ผู้ใช้"}
-          </span>
-          <LogoutButton />
+        <div className="relative order-2 ml-auto sm:order-3">
+          <button
+            type="button"
+            aria-label="เปิดเมนูบัญชีผู้ใช้"
+            aria-expanded={isUserMenuOpen}
+            aria-controls="user-account-menu"
+            onClick={() => setIsUserMenuOpen((current) => !current)}
+            className="flex size-11 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <UserRound className="size-5" aria-hidden="true" />
+          </button>
+
+          {isUserMenuOpen ? (
+            <div
+              id="user-account-menu"
+              className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-64 rounded-xl border bg-card p-3 shadow-lg"
+            >
+              <p className="text-xs font-medium text-muted-foreground">บัญชีผู้ใช้</p>
+              <p className="mt-1 truncate text-sm font-medium">{userEmail ?? "ไม่พบอีเมล"}</p>
+              <div className="mt-3 border-t pt-3 [&>button]:w-full">
+                <LogoutButton />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </header>

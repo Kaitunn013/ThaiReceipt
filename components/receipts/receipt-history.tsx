@@ -11,6 +11,7 @@ import {
 } from "@/lib/receipts";
 
 const RECEIPT_POLL_INTERVAL_MS = 3000;
+const INITIAL_VISIBLE_RECEIPTS = 5;
 
 export function ReceiptHistory({
   receipts: initialReceipts,
@@ -23,7 +24,9 @@ export function ReceiptHistory({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ? "โหลดประวัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" : null
   );
+  const [showAll, setShowAll] = useState(false);
   const requestActive = useRef(false);
+  const visibleReceipts = showAll ? receipts : receipts.slice(0, INITIAL_VISIBLE_RECEIPTS);
 
   const loadReceipts = useCallback(async (showError: boolean) => {
     if (requestActive.current) return;
@@ -85,28 +88,39 @@ export function ReceiptHistory({
           ยังไม่มีใบเสร็จที่บันทึก เลือกรูปใบเสร็จเพื่อให้ระบบอ่านและบันทึกอัตโนมัติ
         </p>
       ) : (
-        <ul className="mt-4 divide-y">
-          {receipts.map((receipt) => (
-            <li key={receipt.id}>
-              <Link
-                href={"/dashboard/receipts/" + receipt.id}
-                prefetch={false}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-4 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-medium">{receipt.vendor_name || "ไม่ระบุร้านค้า"}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatReceiptDate(receipt.date)} · {getReceiptCategoryLabel(receipt.category)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold tabular-nums">{formatReceiptAmount(receipt.amount)}</p>
-                  <p className="mt-1 text-sm text-primary">ดูรายละเอียด →</p>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-4 divide-y">
+            {visibleReceipts.map((receipt) => (
+              <li key={receipt.id}>
+                <Link
+                  href={"/dashboard/receipts/" + receipt.id}
+                  prefetch={false}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-4 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-medium">{receipt.vendor_name || "ไม่ระบุร้านค้า"}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {formatReceiptDate(receipt.date)} · {getReceiptCategoryLabel(receipt.category)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold tabular-nums">{formatReceiptAmount(receipt.amount)}</p>
+                    <p className="mt-1 text-sm text-primary">ดูรายละเอียด →</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {receipts.length > INITIAL_VISIBLE_RECEIPTS && !showAll ? (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="mt-4 min-h-11 w-full rounded-lg border px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              ดูทั้งหมด ({receipts.length} รายการ)
+            </button>
+          ) : null}
+        </>
       )}
     </section>
   );
