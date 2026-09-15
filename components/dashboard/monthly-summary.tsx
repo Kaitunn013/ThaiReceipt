@@ -1,3 +1,7 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+
 import { formatReceiptAmount, receiptCategoryOptions } from "@/lib/receipts";
 
 type MonthlyReceipt = {
@@ -9,8 +13,6 @@ type CategoryBudget = {
   category: string;
   amount: number;
 };
-
-type SaveBudgetAction = (formData: FormData) => void | Promise<void>;
 
 type CategoryTotal = {
   value: string;
@@ -86,21 +88,19 @@ export function MonthlySummary({
   receipts,
   hasError,
   months,
-  budgets,
-  saveBudget,
-  budgetError,
-  budgetSaved
+  budgets
 }: {
   month: string;
   receipts: MonthlyReceipt[];
   hasError: boolean;
   months: string[];
   budgets: CategoryBudget[];
-  saveBudget: SaveBudgetAction;
-  budgetError: boolean;
-  budgetSaved: boolean;
 }) {
-  const categoryTotals = buildCategoryTotals(receipts, budgets);
+  const [currentBudgets, setCurrentBudgets] = useState(budgets);
+  const [savingCategory, setSavingCategory] = useState<string | null>(null);
+  const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
+  const [budgetError, setBudgetError] = useState(false);
+  const categoryTotals = buildCategoryTotals(receipts, currentBudgets);
   const totalAmount = categoryTotals.reduce((sum, item) => sum + item.amount, 0);
   const largestCategory = categoryTotals
     .filter((item) => item.amount > 0)
@@ -108,6 +108,45 @@ export function MonthlySummary({
       (largest, item) => (!largest || item.amount > largest.amount ? item : largest),
       null
     );
+
+  async function handleBudgetSubmit(event: FormEvent<HTMLFormElement>, category: string) {
+    event.preventDefault();
+    const rawLimit = String(new FormData(event.currentTarget).get("limit") ?? "").trim();
+    const limit = rawLimit ? Number(rawLimit) : null;
+
+    if (limit !== null && (!Number.isFinite(limit) || limit <= 0 || limit > 100000000)) {
+      setBudgetError(true);
+      setBudgetMessage(null);
+      return;
+    }
+
+    setSavingCategory(category);
+    setBudgetError(false);
+    setBudgetMessage(null);
+
+    try {
+      const response = await fetch("/api/category-budgets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month, category, limit })
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(body?.error ?? "บันทึกวงเงินไม่สำเร็จ");
+      }
+
+      setCurrentBudgets((current) => {
+        const withoutCurrent = current.filter((item) => item.category !== category);
+        return limit === null ? withoutCurrent : [...withoutCurrent, { category, amount: limit }];
+      });
+      setBudgetMessage(category);
+    } catch {
+      setBudgetError(true);
+    } finally {
+      setSavingCategory(null);
+    }
+  }
 
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm" aria-labelledby="monthly-summary-title">
@@ -153,11 +192,11 @@ export function MonthlySummary({
         <>
           {budgetError ? (
             <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700" role="alert">
-              บันทึกวงเงินไม่สำเร็จ กรุณาตรวจสอบตัวเลขแล้วลองใหม่
+              บันทึกวงเงินไม่สำเร็จ กรุณาตรวจสอบตัวเลขและลองใหม่อีกครั้ง
             </div>
-          ) : budgetSaved ? (
+          ) : budgetMessage ? (
             <div className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-green-700" role="status">
-              บันทึกวงเงินเรียบร้อยแล้ว
+              บันทึกวงเงินหมวด{categoryTotals.find((item) => item.value === budgetMessage)?.label ?? ""} แล้ว
             </div>
           ) : null}
 
@@ -281,7 +320,11 @@ export function MonthlySummary({
                       </div>
                     ) : null}
 
-                    <form action={saveBudget} className="mt-4 border-t pt-4">
+                    <form
+                      key={item.value + "-" + (item.limit ?? "none")}
+                      onSubmit={(event) => void handleBudgetSubmit(event, item.value)}
+                      className="mt-4 border-t pt-4"
+                    >
                       <input type="hidden" name="month" value={month} />
                       <input type="hidden" name="category" value={item.value} />
                       <label htmlFor={"budget-" + item.value} className="text-sm font-medium">
@@ -301,9 +344,10 @@ export function MonthlySummary({
                         />
                         <button
                           type="submit"
-                          className="h-11 shrink-0 rounded-lg border px-3 font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          disabled={savingCategory === item.value}
+                          className="h-11 shrink-0 rounded-lg border px-3 font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          บันทึก
+                          {savingCategory === item.value ? "กำลังบันทึก..." : "บันทึก"}
                         </button>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">เว้นว่างเพื่อล้างวงเงิน</p>
