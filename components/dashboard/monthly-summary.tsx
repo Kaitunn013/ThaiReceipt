@@ -530,7 +530,6 @@ export function CategoryBudgetHealth({
   const overallProgress = budgetTotal ? Math.min((totalAmount / budgetTotal) * 100, 100) : 0;
   const isOverBudget = budgetTotal > 0 && totalAmount > budgetTotal;
   const isNearBudget = budgetTotal > 0 && totalAmount >= budgetTotal * 0.8;
-  const healthColor = isOverBudget ? "red" : isNearBudget ? "yellow" : "green";
   const healthLabel = isOverBudget ? "เกินวงเงิน" : isNearBudget ? "ใกล้ถึงวงเงิน" : "อยู่ในแผน";
   const healthTone = isOverBudget
     ? "bg-red-50 text-red-900"
@@ -573,10 +572,10 @@ export function CategoryBudgetHealth({
               </p>
             </div>
             <Image
-              src={"/images/budget-health/" + healthColor + ".png"}
-              alt={"หมู" + (isOverBudget ? "แดง" : isNearBudget ? "เหลือง" : "เขียว") + ": " + healthLabel}
-              width={healthColor === "green" ? 170 : 1600}
-              height={healthColor === "green" ? 112 : 1600}
+              src="/images/budget-health/green.png"
+              alt="ภาพประกอบสุขภาพการเงิน"
+              width={170}
+              height={112}
               sizes="(max-width: 639px) 96px, 128px"
               className="h-auto w-24 shrink-0 rounded-lg object-contain sm:w-32"
             />
