@@ -229,8 +229,9 @@ export function MonthlySummary({
             <p className="mt-1 text-sm text-muted-foreground">
               ตั้งวงเงินต่อเดือน แล้วระบบจะแจ้งเตือนเมื่อใช้เกินวงเงิน
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {categoryTotals.map((item) => {
+            <div className="mt-4 rounded-2xl border border-border/80 bg-muted/30 p-3 sm:p-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {categoryTotals.map((item) => {
                 const ringColor = item.overLimit ? "#dc2626" : item.color;
                 const ringBackground = item.limit
                   ? "conic-gradient(" +
@@ -248,8 +249,8 @@ export function MonthlySummary({
                   <article
                     key={item.value}
                     className={
-                      "rounded-2xl border p-2 " +
-                      (item.overLimit ? "border-red-200 bg-red-50/60" : "bg-card")
+                      "rounded-xl p-1 " +
+                      (item.overLimit ? "bg-red-50/70" : "bg-card/70")
                     }
                   >
                     <button
@@ -382,8 +383,9 @@ export function MonthlySummary({
                       </div>
                     ) : null}
                   </article>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
 
