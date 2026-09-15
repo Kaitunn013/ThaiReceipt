@@ -84,7 +84,7 @@ async function optimizeReceiptImage(file: File) {
   }
 }
 
-export function ReceiptUpload() {
+export function ReceiptUpload({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -251,6 +251,33 @@ export function ReceiptUpload() {
     void processFiles(failedJobs);
   }
 
+  const fileInput = (
+    <input
+      ref={inputRef}
+      id="receipt-file-input"
+      disabled={isProcessing}
+      className="hidden"
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      multiple
+      onChange={handleFileChange}
+    />
+  );
+
+  if (compact) {
+    return (
+      <div className="scroll-mt-24">
+        {fileInput}
+        {errorMessage ? (
+          <p className="text-sm text-red-700" role="alert">{errorMessage}</p>
+        ) : null}
+        {successMessage ? (
+          <p className="text-sm text-emerald-700" role="status">{successMessage}</p>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -264,14 +291,7 @@ export function ReceiptUpload() {
           </p>
         </div>
 
-        <input
-          ref={inputRef}
-          className="hidden"
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          onChange={handleFileChange}
-        />
+        {fileInput}
         <button
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
           type="button"

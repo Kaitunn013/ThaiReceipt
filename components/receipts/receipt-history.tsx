@@ -23,14 +23,12 @@ export function ReceiptHistory({
   const [errorMessage, setErrorMessage] = useState<string | null>(
     initialError ? "โหลดประวัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" : null
   );
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const requestActive = useRef(false);
 
   const loadReceipts = useCallback(async (showError: boolean) => {
     if (requestActive.current) return;
 
     requestActive.current = true;
-    if (showError) setIsRefreshing(true);
 
     try {
       const response = await fetch("/api/receipts?limit=20", {
@@ -53,7 +51,6 @@ export function ReceiptHistory({
       }
     } finally {
       requestActive.current = false;
-      if (showError) setIsRefreshing(false);
     }
   }, []);
 
@@ -70,21 +67,13 @@ export function ReceiptHistory({
 
   return (
     <section className="rounded-xl border bg-card p-5 shadow-sm" aria-labelledby="receipt-history-title">
-      <div className="flex items-start justify-between gap-4">
+      <div>
         <div>
           <h2 id="receipt-history-title" className="font-semibold">ประวัติใบเสร็จ</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             20 รายการล่าสุดของคุณ · อัปเดตอัตโนมัติทุก 3 วินาที
           </p>
         </div>
-        <button
-          type="button"
-          className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
-          disabled={isRefreshing}
-          onClick={() => void loadReceipts(true)}
-        >
-          {isRefreshing ? "กำลังโหลด..." : "โหลดใหม่"}
-        </button>
       </div>
 
       {errorMessage ? (

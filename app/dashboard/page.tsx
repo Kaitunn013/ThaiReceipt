@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { LogoutButton } from "@/components/auth/logout-button";
 import { LineConnectButton } from "@/components/auth/line-connect-button";
-import { MonthlySummary } from "@/components/dashboard/monthly-summary";
+import { CategoryBudgetHealth, MonthlySummary } from "@/components/dashboard/monthly-summary";
 import { DashboardNav } from "@/components/navigation/dashboard-nav";
 import { ReceiptUpload } from "@/components/receipts/receipt-upload";
 import { ReceiptHistory } from "@/components/receipts/receipt-history";
@@ -140,18 +139,8 @@ export default async function DashboardPage({
 
   return (
     <div className="min-h-screen">
-      <DashboardNav />
-      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-        <section id="home" className="scroll-mt-24">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-primary">จัดการค่าใช้จ่ายในบ้าน</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">สวัสดี, Seepla</h1>
-              <p className="mt-2 text-sm text-muted-foreground">เข้าสู่ระบบด้วย {user.email}</p>
-            </div>
-            <LogoutButton />
-          </div>
-        </section>
+      <DashboardNav userEmail={user.email ?? null} />
+      <main id="home" className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
 
         <div id="dashboard" className="scroll-mt-24 space-y-6">
           <LineConnectButton connected={Boolean(profile?.line_user_id)} message={lineMessage} />
@@ -164,11 +153,14 @@ export default async function DashboardPage({
           />
         </div>
 
-        <div id="upload-receipt" className="scroll-mt-24">
-          <ReceiptUpload />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
+          <div id="history" className="scroll-mt-24">
+            <ReceiptHistory receipts={receipts ?? []} hasError={Boolean(error)} />
+          </div>
+          <CategoryBudgetHealth receipts={monthlyReceipts ?? []} budgets={budgets ?? []} />
         </div>
-        <div id="history" className="scroll-mt-24">
-          <ReceiptHistory receipts={receipts ?? []} hasError={Boolean(error)} />
+        <div id="upload-receipt" className="scroll-mt-24">
+          <ReceiptUpload compact />
         </div>
       </main>
     </div>

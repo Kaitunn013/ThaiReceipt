@@ -1,5 +1,7 @@
 "use client";
 
+import { ChartPie, PiggyBank, Target, Wallet } from "lucide-react";
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
 
 import { formatReceiptAmount, receiptCategoryOptions } from "@/lib/receipts";
@@ -37,6 +39,12 @@ const chartColors = [
   "#ca8a04",
   "#64748b"
 ];
+
+const categoryEmoji: Record<string, string> = {
+  food: "🍱", groceries: "🛒", transportation: "🚗", utilities: "💡",
+  healthcare: "💊", education: "📚", shopping: "🛍️", housing: "🏠",
+  tax_deductible: "🧾", other: "📦"
+};
 
 function formatMonth(month: string) {
   return new Intl.DateTimeFormat("th-TH", {
@@ -109,6 +117,9 @@ export function MonthlySummary({
       (largest, item) => (!largest || item.amount > largest.amount ? item : largest),
       null
     );
+  const budgetTotal = categoryTotals.reduce((sum, item) => sum + (item.limit ?? 0), 0);
+  const remainingBudget = budgetTotal - totalAmount;
+  const usedCategoryCount = categoryTotals.filter((item) => item.amount > 0).length;
 
   async function handleBudgetSubmit(event: FormEvent<HTMLFormElement>, category: string) {
     event.preventDefault();
@@ -158,8 +169,8 @@ export function MonthlySummary({
             เดือน{formatMonth(month)}
           </h2>
         </div>
-        <form action="/dashboard" method="get" className="flex items-end gap-2">
-          <div>
+        <form action="/dashboard" method="get" className="flex flex-wrap items-end gap-2">
+          <div className="w-full sm:w-auto">
             <label htmlFor="summary-month" className="text-sm font-medium">
               เลือกเดือน
             </label>
@@ -167,7 +178,7 @@ export function MonthlySummary({
               id="summary-month"
               name="month"
               defaultValue={month}
-              className="mt-1 h-11 min-w-0 rounded-lg border bg-card px-3 text-base"
+              className="mt-1 h-11 w-full min-w-0 rounded-xl border bg-card px-3 text-base"
             >
               {months.map((option) => (
                 <option key={option} value={option}>
@@ -181,6 +192,20 @@ export function MonthlySummary({
             className="h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             ดูสรุป
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const input = document.getElementById("receipt-file-input") as HTMLInputElement | null;
+              if (input?.disabled) {
+                document.getElementById("upload-receipt")?.scrollIntoView();
+              } else {
+                input?.click();
+              }
+            }}
+            className="h-11 rounded-xl border border-primary/20 bg-secondary px-4 font-medium text-secondary-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            + เพิ่มสลิป
           </button>
         </form>
       </div>
@@ -201,20 +226,67 @@ export function MonthlySummary({
             </div>
           ) : null}
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <article className="rounded-lg bg-muted p-4">
-              <p className="text-sm text-muted-foreground">ยอดรวม</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{formatReceiptAmount(totalAmount)}</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <article className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">ยอดใช้จ่ายเดือนนี้</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
+                    {formatReceiptAmount(totalAmount)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{receipts.length} รายการ</p>
+                </div>
+                <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Wallet className="size-4" aria-hidden="true" />
+                </span>
+              </div>
             </article>
-            <article className="rounded-lg bg-muted p-4">
-              <p className="text-sm text-muted-foreground">จำนวนรายการ</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">{receipts.length} รายการ</p>
+            <article className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">วงเงินเดือนนี้</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
+                    {budgetTotal ? formatReceiptAmount(budgetTotal) : "—"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">จาก limit ที่ตั้งไว้</p>
+                </div>
+                <span className="flex size-9 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+                  <Target className="size-4" aria-hidden="true" />
+                </span>
+              </div>
             </article>
-            <article className="rounded-lg bg-muted p-4">
-              <p className="text-sm text-muted-foreground">หมวดที่ใช้มากที่สุด</p>
-              <p className="mt-1 break-words text-xl font-semibold">
-                {largestCategory?.label ?? "ยังไม่มีรายการ"}
-              </p>
+            <article className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">วงเงินคงเหลือ</p>
+                  <p
+                    className={
+                      "mt-1 text-xl font-semibold tabular-nums " +
+                      (budgetTotal && remainingBudget < 0 ? "text-red-700" : "")
+                    }
+                  >
+                    {budgetTotal ? formatReceiptAmount(remainingBudget) : "—"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">เทียบกับค่าใช้จ่ายเดือนนี้</p>
+                </div>
+                <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                  <PiggyBank className="size-4" aria-hidden="true" />
+                </span>
+              </div>
+            </article>
+            <article className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm text-muted-foreground">หมวดที่มีรายการ</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
+                    {usedCategoryCount} <span className="text-sm font-normal text-muted-foreground">/ 10</span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">หมวดที่ใช้งานในเดือนนี้</p>
+                </div>
+                <span className="flex size-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                  <ChartPie className="size-4" aria-hidden="true" />
+                </span>
+              </div>
             </article>
           </div>
 
@@ -225,12 +297,19 @@ export function MonthlySummary({
           ) : null}
 
           <div className="mt-6">
-            <h3 className="font-medium">ค่าใช้จ่ายและวงเงินรายหมวด</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              ตั้งวงเงินต่อเดือน แล้วระบบจะแจ้งเตือนเมื่อใช้เกินวงเงิน
-            </p>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <h3 className="font-medium">สรุปค่าใช้จ่ายตามหมวด</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  แตะ donut เพื่อดูรายละเอียดและตั้งวงเงิน
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                {usedCategoryCount} / 10 หมวด
+              </span>
+            </div>
             <div className="mt-4 rounded-2xl border border-border/80 bg-muted/30 p-3 sm:p-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
                 {categoryTotals.map((item) => {
                 const ringColor = item.overLimit ? "#dc2626" : item.color;
                 const ringBackground = item.limit
@@ -288,11 +367,8 @@ export function MonthlySummary({
                             : item.label + " ใช้ " + formatReceiptAmount(item.amount) + " ยังไม่ตั้งวงเงิน"
                         }
                       >
-                        <div className="flex size-11 flex-col items-center justify-center rounded-full bg-card text-center shadow-sm">
-                          <span className="text-[10px] text-muted-foreground">ใช้ไป</span>
-                          <span className="mt-0.5 text-[10px] font-semibold tabular-nums">
-                            {formatReceiptAmount(item.amount)}
-                          </span>
+                        <div className="flex size-14 items-center justify-center rounded-full bg-card text-center">
+                          <span className="text-2xl" aria-hidden="true">{categoryEmoji[item.value] ?? "📦"}</span>
                         </div>
                       </div>
                       <span className="mt-2 text-xs font-semibold tabular-nums">
@@ -386,6 +462,27 @@ export function MonthlySummary({
                   );
                 })}
               </div>
+              <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-border/70 pt-3 text-xs">
+                {categoryTotals.some((item) => item.amount > 0) ? (
+                  categoryTotals
+                    .filter((item) => item.amount > 0)
+                    .map((item) => (
+                      <span key={item.value} className="inline-flex items-center gap-1.5">
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                          aria-hidden="true"
+                        />
+                        <span>{item.label}</span>
+                        <span className="text-muted-foreground">
+                          {item.percentage.toFixed(1)}%
+                        </span>
+                      </span>
+                    ))
+                ) : (
+                  <span className="text-muted-foreground">ยังไม่มีค่าใช้จ่ายในเดือนนี้</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -411,6 +508,125 @@ export function MonthlySummary({
             </tbody>
           </table>
         </>
+      )}
+    </section>
+  );
+}
+
+export function CategoryBudgetHealth({
+  receipts,
+  budgets
+}: {
+  receipts: MonthlyReceipt[];
+  budgets: CategoryBudget[];
+}) {
+  const categoryTotals = buildCategoryTotals(receipts, budgets);
+  const trackedCategories = categoryTotals
+    .filter((item) => item.limit !== null)
+    .sort((a, b) => Number(b.overLimit) - Number(a.overLimit) || b.amount - a.amount)
+    .slice(0, 6);
+  const budgetTotal = categoryTotals.reduce((sum, item) => sum + (item.limit ?? 0), 0);
+  const totalAmount = categoryTotals.reduce((sum, item) => sum + item.amount, 0);
+  const overallProgress = budgetTotal ? Math.min((totalAmount / budgetTotal) * 100, 100) : 0;
+  const isOverBudget = budgetTotal > 0 && totalAmount > budgetTotal;
+  const isNearBudget = budgetTotal > 0 && totalAmount >= budgetTotal * 0.8;
+  const healthColor = isOverBudget ? "red" : isNearBudget ? "yellow" : "green";
+  const healthLabel = isOverBudget ? "เกินวงเงิน" : isNearBudget ? "ใกล้ถึงวงเงิน" : "อยู่ในแผน";
+  const healthTone = isOverBudget
+    ? "bg-red-50 text-red-900"
+    : isNearBudget
+      ? "bg-amber-50 text-amber-900"
+      : "bg-emerald-50 text-emerald-900";
+
+  return (
+    <section className="rounded-2xl border bg-card p-5 shadow-sm" aria-labelledby="budget-health-title">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 id="budget-health-title" className="font-semibold">
+            สุขภาพการเงิน
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">ติดตามการใช้จ่ายเทียบกับวงเงิน</p>
+        </div>
+        <span
+          className={
+            "rounded-full px-2.5 py-1 text-xs font-medium " +
+            (budgetTotal ? healthTone : "bg-muted text-muted-foreground")
+          }
+        >
+          {budgetTotal ? healthLabel : "ยังไม่ตั้งวงเงิน"}
+        </span>
+      </div>
+
+      {budgetTotal ? (
+        <>
+          <div className={"mt-5 flex items-center gap-3 rounded-xl p-3 " + healthTone} role="status">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">
+                {isOverBudget
+                  ? "ใช้เกินวงเงินรวมเดือนนี้"
+                  : isNearBudget
+                    ? "ใช้ถึง 80% ของวงเงินรวมแล้ว ควรระวัง"
+                    : "การใช้จ่ายยังอยู่ในวงเงินรวม"}
+              </p>
+              <p className="mt-1 text-xs">
+                ใช้ {formatReceiptAmount(totalAmount)} จาก {formatReceiptAmount(budgetTotal)}
+              </p>
+            </div>
+            <Image
+              src={"/images/budget-health/" + healthColor + ".png"}
+              alt={"หมู" + (isOverBudget ? "แดง" : isNearBudget ? "เหลือง" : "เขียว") + ": " + healthLabel}
+              width={healthColor === "green" ? 170 : 1600}
+              height={healthColor === "green" ? 112 : 1600}
+              sizes="(max-width: 639px) 96px, 128px"
+              className="h-auto w-24 shrink-0 rounded-lg object-contain sm:w-32"
+            />
+          </div>
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span>วงเงินรวม</span>
+              <span className={isOverBudget ? "font-medium text-red-700" : "text-muted-foreground"}>
+                {overallProgress.toFixed(0)}%
+              </span>
+            </div>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label="การใช้วงเงินรวม"
+              aria-valuemin={0}
+              aria-valuemax={budgetTotal}
+              aria-valuenow={Math.min(totalAmount, budgetTotal)}
+            >
+              <div
+                className={"h-full rounded-full " + (isOverBudget ? "bg-red-500" : isNearBudget ? "bg-amber-500" : "bg-emerald-500")}
+                style={{ width: overallProgress + "%" }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {trackedCategories.map((item) => (
+              <div key={item.value}>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="min-w-0 truncate">{item.label}</span>
+                  <span className={item.overLimit ? "font-medium text-red-700" : "text-muted-foreground"}>
+                    {formatReceiptAmount(item.amount)} / {formatReceiptAmount(item.limit ?? 0)}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={"h-full rounded-full " + (item.overLimit ? "bg-red-500" : "bg-primary/70")}
+                    style={{ width: item.progress + "%" }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="mt-5 rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+          ยังไม่ได้ตั้งวงเงิน แตะ donut ของแต่ละหมวดเพื่อเริ่มตั้ง limit
+        </div>
       )}
     </section>
   );
