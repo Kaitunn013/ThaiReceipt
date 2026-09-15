@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { LineConnectButton } from "@/components/auth/line-connect-button";
 import { MonthlySummary } from "@/components/dashboard/monthly-summary";
+import { DashboardNav } from "@/components/navigation/dashboard-nav";
 import { ReceiptUpload } from "@/components/receipts/receipt-upload";
 import { ReceiptHistory } from "@/components/receipts/receipt-history";
 import type { ReceiptSummary } from "@/lib/receipts";
@@ -138,26 +139,38 @@ export default async function DashboardPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-5 py-10">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-primary">Thai household finance</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-2 text-sm text-muted-foreground">เข้าสู่ระบบด้วย {user.email}</p>
-        </div>
-        <LogoutButton />
-      </div>
+    <div className="min-h-screen">
+      <DashboardNav />
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+        <section id="home" className="scroll-mt-24">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-primary">จัดการค่าใช้จ่ายในบ้าน</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">สวัสดี, Seepla</h1>
+              <p className="mt-2 text-sm text-muted-foreground">เข้าสู่ระบบด้วย {user.email}</p>
+            </div>
+            <LogoutButton />
+          </div>
+        </section>
 
-      <LineConnectButton connected={Boolean(profile?.line_user_id)} message={lineMessage} />
-      <MonthlySummary
-        month={summaryMonth}
-        receipts={monthlyReceipts ?? []}
-        hasError={Boolean(monthlyError)}
-        months={monthOptions}
-        budgets={budgets ?? []}
-      />
-      <ReceiptUpload />
-      <ReceiptHistory receipts={receipts ?? []} hasError={Boolean(error)} />
-    </main>
+        <div id="dashboard" className="scroll-mt-24 space-y-6">
+          <LineConnectButton connected={Boolean(profile?.line_user_id)} message={lineMessage} />
+          <MonthlySummary
+            month={summaryMonth}
+            receipts={monthlyReceipts ?? []}
+            hasError={Boolean(monthlyError)}
+            months={monthOptions}
+            budgets={budgets ?? []}
+          />
+        </div>
+
+        <div id="upload-receipt" className="scroll-mt-24">
+          <ReceiptUpload />
+        </div>
+        <div id="history" className="scroll-mt-24">
+          <ReceiptHistory receipts={receipts ?? []} hasError={Boolean(error)} />
+        </div>
+      </main>
+    </div>
   );
 }

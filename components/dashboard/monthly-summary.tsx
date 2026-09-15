@@ -97,6 +97,7 @@ export function MonthlySummary({
   budgets: CategoryBudget[];
 }) {
   const [currentBudgets, setCurrentBudgets] = useState(budgets);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
   const [savingCategory, setSavingCategory] = useState<string | null>(null);
   const [budgetMessage, setBudgetMessage] = useState<string | null>(null);
   const [budgetError, setBudgetError] = useState(false);
@@ -228,7 +229,7 @@ export function MonthlySummary({
             <p className="mt-1 text-sm text-muted-foreground">
               ตั้งวงเงินต่อเดือน แล้วระบบจะแจ้งเตือนเมื่อใช้เกินวงเงิน
             </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {categoryTotals.map((item) => {
                 const ringColor = item.overLimit ? "#dc2626" : item.color;
                 const ringBackground = item.limit
@@ -247,22 +248,34 @@ export function MonthlySummary({
                   <article
                     key={item.value}
                     className={
-                      "rounded-xl border p-4 " +
-                      (item.overLimit ? "border-red-300 bg-red-50/70" : "bg-card")
+                      "rounded-2xl border p-3 " +
+                      (item.overLimit ? "border-red-200 bg-red-50/60" : "bg-card")
                     }
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <h4 className="font-medium">{item.label}</h4>
+                    <div className="flex min-h-10 items-start justify-between gap-2">
+                      <h4 className="text-sm font-semibold leading-5">{item.label}</h4>
                       {item.overLimit ? (
-                        <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700">
+                        <span className="shrink-0 rounded-full bg-red-100 px-2 py-1 text-[11px] font-medium text-red-700">
                           เกินวงเงิน
                         </span>
                       ) : null}
                     </div>
 
-                    <div className="mt-4 flex items-center gap-4">
+                    <button
+                      type="button"
+                      aria-expanded={openCategory === item.value}
+                      aria-label={
+                        openCategory === item.value
+                          ? "ซ่อนรายละเอียดหมวด" + item.label
+                          : "ดูรายละเอียดและตั้งวงเงินหมวด" + item.label
+                      }
+                      onClick={() =>
+                        setOpenCategory((current) => (current === item.value ? null : item.value))
+                      }
+                      className="group mt-2 flex min-h-36 w-full flex-col items-center justify-center rounded-xl p-2 text-center transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                       <div
-                        className="flex size-32 shrink-0 items-center justify-center rounded-full"
+                        className="flex size-24 shrink-0 items-center justify-center rounded-full"
                         style={{ background: ringBackground }}
                         role="img"
                         aria-label={
@@ -275,83 +288,100 @@ export function MonthlySummary({
                             : item.label + " ใช้ " + formatReceiptAmount(item.amount) + " ยังไม่ตั้งวงเงิน"
                         }
                       >
-                        <div className="flex size-20 flex-col items-center justify-center rounded-full bg-card text-center shadow-sm">
-                          <span className="text-xs text-muted-foreground">ใช้ไป</span>
-                          <span className="mt-1 text-xs font-semibold tabular-nums">
+                        <div className="flex size-14 flex-col items-center justify-center rounded-full bg-card text-center shadow-sm">
+                          <span className="text-[11px] text-muted-foreground">ใช้ไป</span>
+                          <span className="mt-1 text-[11px] font-semibold tabular-nums">
                             {formatReceiptAmount(item.amount)}
                           </span>
                         </div>
                       </div>
+                      <span className="mt-2 text-sm font-semibold tabular-nums">
+                        {formatReceiptAmount(item.amount)}
+                      </span>
+                      <span className="mt-1 text-xs text-muted-foreground">
+                        {openCategory === item.value ? "แตะเพื่อซ่อน" : "แตะเพื่อดูรายละเอียด"}
+                      </span>
+                    </button>
 
-                      <div className="min-w-0 text-sm">
-                        <p className="text-muted-foreground">สัดส่วนรวม</p>
-                        <p className="mt-1 font-medium tabular-nums">{item.percentage.toFixed(1)}%</p>
-                        <p className="mt-3 text-muted-foreground">
-                          {item.limit
-                            ? "วงเงิน " + formatReceiptAmount(item.limit)
-                            : "ยังไม่ได้ตั้งวงเงิน"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {item.limit ? (
-                      <div className="mt-4">
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <span>ความคืบหน้าวงเงิน</span>
-                          <span className={item.overLimit ? "font-medium text-red-700" : "text-muted-foreground"}>
-                            {item.overLimit
-                              ? "เกิน " + formatReceiptAmount(item.amount - item.limit)
-                              : item.progress.toFixed(0) + "%"}
-                          </span>
+                    {openCategory === item.value ? (
+                      <div className="mt-2 border-t pt-3">
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-lg bg-muted p-2">
+                            <p className="text-muted-foreground">สัดส่วน</p>
+                            <p className="mt-1 font-semibold tabular-nums">{item.percentage.toFixed(1)}%</p>
+                          </div>
+                          <div className="rounded-lg bg-muted p-2">
+                            <p className="text-muted-foreground">วงเงิน</p>
+                            <p className="mt-1 font-semibold tabular-nums">
+                              {item.limit ? formatReceiptAmount(item.limit) : "ยังไม่ตั้ง"}
+                            </p>
+                          </div>
                         </div>
-                        <div
-                          className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
-                          role="progressbar"
-                          aria-label={"ใช้วงเงินหมวด" + item.label}
-                          aria-valuemin={0}
-                          aria-valuemax={item.limit}
-                          aria-valuenow={Math.min(item.amount, item.limit)}
+
+                        {item.limit ? (
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span>ความคืบหน้าวงเงิน</span>
+                              <span
+                                className={
+                                  item.overLimit ? "font-medium text-red-700" : "text-muted-foreground"
+                                }
+                              >
+                                {item.overLimit
+                                  ? "เกิน " + formatReceiptAmount(item.amount - item.limit)
+                                  : item.progress.toFixed(0) + "%"}
+                              </span>
+                            </div>
+                            <div
+                              className="mt-2 h-2 overflow-hidden rounded-full bg-muted"
+                              role="progressbar"
+                              aria-label={"ใช้วงเงินหมวด" + item.label}
+                              aria-valuemin={0}
+                              aria-valuemax={item.limit}
+                              aria-valuenow={Math.min(item.amount, item.limit)}
+                            >
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: item.progress + "%", backgroundColor: ringColor }}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <form
+                          key={item.value + "-" + (item.limit ?? "none")}
+                          onSubmit={(event) => void handleBudgetSubmit(event, item.value)}
+                          className="mt-3"
                         >
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: item.progress + "%", backgroundColor: ringColor }}
-                          />
-                        </div>
+                          <input type="hidden" name="month" value={month} />
+                          <input type="hidden" name="category" value={item.value} />
+                          <label htmlFor={"budget-" + item.value} className="text-xs font-medium">
+                            วงเงินต่อเดือน
+                          </label>
+                          <div className="mt-1 flex gap-2">
+                            <input
+                              id={"budget-" + item.value}
+                              name="limit"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              inputMode="decimal"
+                              defaultValue={item.limit ?? ""}
+                              placeholder="เช่น 5000"
+                              className="h-11 min-w-0 flex-1 rounded-lg border bg-card px-3 text-sm"
+                            />
+                            <button
+                              type="submit"
+                              disabled={savingCategory === item.value}
+                              className="h-11 shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {savingCategory === item.value ? "กำลังบันทึก..." : "บันทึก"}
+                            </button>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">เว้นว่างเพื่อล้างวงเงิน</p>
+                        </form>
                       </div>
                     ) : null}
-
-                    <form
-                      key={item.value + "-" + (item.limit ?? "none")}
-                      onSubmit={(event) => void handleBudgetSubmit(event, item.value)}
-                      className="mt-4 border-t pt-4"
-                    >
-                      <input type="hidden" name="month" value={month} />
-                      <input type="hidden" name="category" value={item.value} />
-                      <label htmlFor={"budget-" + item.value} className="text-sm font-medium">
-                        วงเงินต่อเดือน
-                      </label>
-                      <div className="mt-1 flex gap-2">
-                        <input
-                          id={"budget-" + item.value}
-                          name="limit"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          inputMode="decimal"
-                          defaultValue={item.limit ?? ""}
-                          placeholder="เช่น 5000"
-                          className="h-11 min-w-0 flex-1 rounded-lg border bg-card px-3 text-base"
-                        />
-                        <button
-                          type="submit"
-                          disabled={savingCategory === item.value}
-                          className="h-11 shrink-0 rounded-lg border px-3 font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {savingCategory === item.value ? "กำลังบันทึก..." : "บันทึก"}
-                        </button>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">เว้นว่างเพื่อล้างวงเงิน</p>
-                    </form>
                   </article>
                 );
               })}
