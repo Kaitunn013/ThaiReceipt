@@ -87,7 +87,7 @@ export function DashboardNav({ userEmail }: { userEmail: string | null }) {
           })}
         </nav>
 
-        <div className="relative order-2 ml-auto sm:order-3">
+        <div className="relative order-2 sm:order-3">
           <button
             type="button"
             aria-label="เปิดเมนูบัญชีผู้ใช้"

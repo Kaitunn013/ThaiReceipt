@@ -226,7 +226,7 @@ export function MonthlySummary({
           ) : null}
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+            <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
               <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">ยอดใช้จ่ายเดือนนี้</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
@@ -239,11 +239,11 @@ export function MonthlySummary({
                 alt="มาสคอตตรวจสอบรายจ่าย"
                 width={1600}
                 height={1600}
-                sizes="60px"
-                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                sizes="70px"
+                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
-            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+            <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
               <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">วงเงินเดือนนี้</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
@@ -256,11 +256,11 @@ export function MonthlySummary({
                 alt="มาสคอตผู้พิทักษ์วงเงิน"
                 width={1600}
                 height={1600}
-                sizes="60px"
-                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                sizes="70px"
+                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
-            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+            <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
               <div className="relative z-10 pr-16">
                   <p className="text-sm text-muted-foreground">วงเงินคงเหลือ</p>
                   <p
@@ -279,10 +279,10 @@ export function MonthlySummary({
                 width={1600}
                 height={1600}
                 sizes="80px"
-                className="mascot-float pointer-events-none absolute right-2 top-1 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                className="mascot-float pointer-events-none absolute -top-6 right-2 z-0 size-20 object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
-            <article className="relative overflow-hidden rounded-2xl border bg-card p-4 shadow-sm">
+            <article className="relative overflow-visible rounded-2xl border bg-card p-4 shadow-sm">
               <div className="relative z-10 pr-14">
                   <p className="text-sm text-muted-foreground">หมวดที่มีรายการ</p>
                   <p className="mt-1 text-xl font-semibold tabular-nums">
@@ -295,8 +295,8 @@ export function MonthlySummary({
                 alt="มาสคอตจัดหมวดหมู่รายจ่าย"
                 width={1920}
                 height={1280}
-                sizes="60px"
-                className="pointer-events-none absolute right-3 top-3 size-[60px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
+                sizes="70px"
+                className="pointer-events-none absolute -top-5 right-3 z-0 size-[70px] object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.1)]"
               />
             </article>
           </div>
